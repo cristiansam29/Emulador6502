@@ -1,6 +1,7 @@
+// 6502 CPU implementation
 #pragma once
 
-#include "Bus.h"
+#include "bus.h"
 
 #include <stdint.h>
 
