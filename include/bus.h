@@ -1,3 +1,4 @@
+// Abstract CPU bus interface
 #pragma once
 
 #include <cstdint>

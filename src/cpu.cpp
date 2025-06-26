@@ -1,4 +1,4 @@
-#include "c6502.h"
+#include "cpu.h"
 
 #include <cassert>
 
