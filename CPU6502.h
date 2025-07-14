@@ -1,15 +1,15 @@
 #pragma once
 
-#include "Bus.h"
+#include "NesBus.h"
 
 #include <stdint.h>
 
-class c6502 {
+class CPU6502 {
     class CpuReset {};
 
     enum class DelayedOps { None, SEI, CLI } delayed_ops = DelayedOps::None;
 
-    Bus &bus_;
+    NesBus &bus_;
 
     uint8_t regA, regX, regY;
     uint8_t regSp;
@@ -34,7 +34,7 @@ class c6502 {
     };
 
 public:
-    explicit c6502(Bus &bus) : bus_(bus) {}
+    explicit CPU6502(NesBus &bus) : bus_(bus) {}
 
     
     void setReset(bool state);

@@ -1,4 +1,4 @@
-#include "c6502.h"
+#include "CPU6502.h"
 
 #include <cassert>
 
@@ -8,7 +8,7 @@ static Addr compose(uint8_t high, uint8_t low) {
     return high<<8 | low;
 }
 
-void c6502::runCpu() {
+void CPU6502::runCpu() {
     while(true) {
         try {
             if( reset_pending )
@@ -20,29 +20,29 @@ void c6502::runCpu() {
     }
 }
 
-void c6502::setReset(bool state) {
+void CPU6502::setReset(bool state) {
     reset = state;
     if( state )
         reset_pending = true;
 
     std::cout<<"CPU reset "<<state<<"\n";
 }
-void c6502::setIrq(bool state) {
+void CPU6502::setIrq(bool state) {
     irq = state;
     std::cout<<"CPU IRQ "<<state<<"\n";
 }
-void c6502::setNmi(bool state) {
+void CPU6502::setNmi(bool state) {
     if( !nmi && state )
         nmi_pending = true;
 
     nmi = state;
     std::cout<<"CPU NMI "<<state<<"\n";
 }
-void c6502::setReady(bool state) {
+void CPU6502::setReady(bool state) {
     ready = state;
     std::cout<<"CPU ready "<<state<<"\n";
 }
-void c6502::setSo(bool state) {
+void CPU6502::setSo(bool state) {
     if( !so && state )
         ccSet( CC::oVerflow, true );
     so = state;
@@ -50,7 +50,7 @@ void c6502::setSo(bool state) {
 }
 
 
-void c6502::handleInstruction() {
+void CPU6502::handleInstruction() {
     if( nmi_pending ) {
         handleNmi();
     }
@@ -232,7 +232,7 @@ void c6502::handleInstruction() {
     }
 }
 
-void c6502::resetSequence() {
+void CPU6502::resetSequence() {
     incompatible = true;
     while( reset ) {
         read( pc() );
@@ -259,18 +259,18 @@ void c6502::resetSequence() {
     ccSet( CC::IntMask, true );
 }
 
-void c6502::advance_pc() {
+void CPU6502::advance_pc() {
     Addr pc_ = pc();
     pc_++;
     regPcH = pc_>>8;
     regPcL = pc_ & 0xff;
 }
 
-Addr c6502::pc() const {
+Addr CPU6502::pc() const {
     return compose(regPcH, regPcL);
 }
 
-uint8_t c6502::read( Addr address, bool sync ) {
+uint8_t CPU6502::read( Addr address, bool sync ) {
     uint8_t result;
     do {
         result = bus_.read( this, address, sync );
@@ -289,7 +289,7 @@ uint8_t c6502::read( Addr address, bool sync ) {
     return result;
 }
 
-void c6502::write( Addr address, uint8_t data ) {
+void CPU6502::write( Addr address, uint8_t data ) {
     if( reset_pending ) {
         incompatible = true;
 
@@ -307,11 +307,11 @@ void c6502::write( Addr address, uint8_t data ) {
 }
 
 
-uint8_t c6502::ccGet( CC cc ) const {
+uint8_t CPU6502::ccGet( CC cc ) const {
     return bool( regStatus & (1<<int(cc)) );
 }
 
-void c6502::ccSet( CC cc, bool value ) {
+void CPU6502::ccSet( CC cc, bool value ) {
     if( value ) {
         regStatus |= 1<<int(cc);
     } else {
@@ -319,7 +319,7 @@ void c6502::ccSet( CC cc, bool value ) {
     }
 }
 
-void c6502::handleNmi() {
+void CPU6502::handleNmi() {
     nmi_pending = false;
 
     read( pc() );
@@ -335,7 +335,7 @@ void c6502::handleNmi() {
     regPcH = read( 0xfffb );
 }
 
-void c6502::handleIrq() {
+void CPU6502::handleIrq() {
     if( ccGet( CC::IntMask ) )
         return;
 
@@ -353,7 +353,7 @@ void c6502::handleIrq() {
 }
 
 // Address modes
-Addr c6502::addrmode_abs() {
+Addr CPU6502::addrmode_abs() {
     Addr res = read( pc() );
     advance_pc();
     res |= read( pc() ) << 8;
@@ -362,7 +362,7 @@ Addr c6502::addrmode_abs() {
     return res;
 }
 
-Addr c6502::addrmode_abs_ind() {
+Addr CPU6502::addrmode_abs_ind() {
     uint8_t addrL = read( pc() );
     advance_pc();
     uint8_t addrH = read( pc() );
@@ -374,7 +374,7 @@ Addr c6502::addrmode_abs_ind() {
     return res;
 }
 
-Addr c6502::addrmode_abs_x(bool always_waste_cycle) {
+Addr CPU6502::addrmode_abs_x(bool always_waste_cycle) {
     Addr resL = read( pc() );
     advance_pc();
     Addr resH = read( pc() ) << 8;
@@ -388,7 +388,7 @@ Addr c6502::addrmode_abs_x(bool always_waste_cycle) {
     return resL + resH;
 }
 
-Addr c6502::addrmode_abs_y(bool always_waste_cycle) {
+Addr CPU6502::addrmode_abs_y(bool always_waste_cycle) {
     Addr resL = read( pc() );
     advance_pc();
     Addr resH = read( pc() ) << 8;
@@ -402,37 +402,37 @@ Addr c6502::addrmode_abs_y(bool always_waste_cycle) {
     return resL + resH;
 }
 
-Addr c6502::addrmode_immediate() {
+Addr CPU6502::addrmode_immediate() {
     Addr stored_pc = pc();
     advance_pc();
 
     return stored_pc;
 }
 
-Addr c6502::addrmode_implicit() {
+Addr CPU6502::addrmode_implicit() {
     read( pc() );
 
     return pc();
 }
 
-Addr c6502::addrmode_special() {
+Addr CPU6502::addrmode_special() {
     return pc();
 }
 
-Addr c6502::addrmode_stack() {
+Addr CPU6502::addrmode_stack() {
     read( pc() );
 
     return compose( 0x01, regSp );
 }
 
-Addr c6502::addrmode_zp() {
+Addr CPU6502::addrmode_zp() {
     uint8_t addr = read( pc() );
     advance_pc();
 
     return addr;
 }
 
-Addr c6502::addrmode_zp_ind() {
+Addr CPU6502::addrmode_zp_ind() {
     uint8_t addr = read( pc() );
     advance_pc();
 
@@ -443,7 +443,7 @@ Addr c6502::addrmode_zp_ind() {
     return res_lsb + res_msb*256;
 }
 
-Addr c6502::addrmode_zp_ind_y(bool always_waste_cycle) {
+Addr CPU6502::addrmode_zp_ind_y(bool always_waste_cycle) {
     uint8_t addr = read( pc() );
     advance_pc();
 
@@ -459,7 +459,7 @@ Addr c6502::addrmode_zp_ind_y(bool always_waste_cycle) {
     return res_lsb + res_msb*256;
 }
 
-Addr c6502::addrmode_zp_x() {
+Addr CPU6502::addrmode_zp_x() {
     uint8_t addr = read( pc() );
     advance_pc();
 
@@ -468,7 +468,7 @@ Addr c6502::addrmode_zp_x() {
     return (addr + regX) & 0xff;
 }
 
-Addr c6502::addrmode_zp_x_ind() {
+Addr CPU6502::addrmode_zp_x_ind() {
     uint8_t zp = read( pc() );
     advance_pc();
 
@@ -486,7 +486,7 @@ Addr c6502::addrmode_zp_x_ind() {
     return addr;
 }
 
-Addr c6502::addrmode_zp_y() {
+Addr CPU6502::addrmode_zp_y() {
     uint8_t addr = read( pc() );
     advance_pc();
 
@@ -495,7 +495,7 @@ Addr c6502::addrmode_zp_y() {
     return (addr + regY) & 0xff;
 }
 
-void c6502::branch_helper(Addr addr, bool jump) {
+void CPU6502::branch_helper(Addr addr, bool jump) {
     int8_t offset = read(addr);
 
     if( jump ) {
@@ -513,7 +513,7 @@ void c6502::branch_helper(Addr addr, bool jump) {
     }
 }
 
-void c6502::op_adc(Addr addr) {
+void CPU6502::op_adc(Addr addr) {
     uint16_t val = read(addr);
 
     bool sameSign = (val & 0x80) == (regA & 0x80);
@@ -530,13 +530,13 @@ void c6502::op_adc(Addr addr) {
     updateNZ( val );
 }
 
-void c6502::op_and(Addr addr) {
+void CPU6502::op_and(Addr addr) {
     regA &= read(addr);
 
     updateNZ( regA );
 }
 
-void c6502::op_asl(Addr addr) {
+void CPU6502::op_asl(Addr addr) {
     uint16_t val = read(addr);
     write(addr, val);
     val <<= 1;
@@ -548,7 +548,7 @@ void c6502::op_asl(Addr addr) {
     write(addr, val);
 }
 
-void c6502::op_aslA() {
+void CPU6502::op_aslA() {
     read( pc() );
 
     uint16_t val = regA;
@@ -562,19 +562,19 @@ void c6502::op_aslA() {
     regA = val;
 }
 
-void c6502::op_bcc(Addr addr) {
+void CPU6502::op_bcc(Addr addr) {
     branch_helper(addr, ! ccGet(CC::Carry));
 }
 
-void c6502::op_bcs(Addr addr) {
+void CPU6502::op_bcs(Addr addr) {
     branch_helper(addr, ccGet(CC::Carry));
 }
 
-void c6502::op_beq(Addr addr) {
+void CPU6502::op_beq(Addr addr) {
     branch_helper(addr, ccGet(CC::Zero));
 }
 
-void c6502::op_bit(Addr addr) {
+void CPU6502::op_bit(Addr addr) {
     uint8_t mem = read(addr);
     uint8_t result = regA ^ mem;
 
@@ -583,20 +583,20 @@ void c6502::op_bit(Addr addr) {
     ccSet( CC::Zero, result==0 );
 }
 
-void c6502::op_bne(Addr addr) {
+void CPU6502::op_bne(Addr addr) {
     branch_helper(addr, ! ccGet(CC::Zero));
 }
 
-void c6502::op_bmi(Addr addr) {
+void CPU6502::op_bmi(Addr addr) {
     branch_helper(addr, ccGet(CC::Negative));
 }
 
-void c6502::op_bpl(Addr addr) {
+void CPU6502::op_bpl(Addr addr) {
     branch_helper(addr, ! ccGet(CC::Negative));
 }
 
 
-void c6502::op_brk(Addr addr) {
+void CPU6502::op_brk(Addr addr) {
     read(addr);
 
     write( compose(0x01, regSp--), regPcH );
@@ -609,31 +609,31 @@ void c6502::op_brk(Addr addr) {
     ccSet( CC::IntMask, true );
 }
 
-void c6502::op_bvc(Addr addr) {
+void CPU6502::op_bvc(Addr addr) {
     branch_helper(addr, ! ccGet(CC::oVerflow));
 }
 
-void c6502::op_bvs(Addr addr) {
+void CPU6502::op_bvs(Addr addr) {
     branch_helper(addr, ccGet(CC::oVerflow));
 }
 
-void c6502::op_clc(Addr addr) {
+void CPU6502::op_clc(Addr addr) {
     ccSet( CC::Carry, false );
 }
 
-void c6502::op_cld(Addr addr) {
+void CPU6502::op_cld(Addr addr) {
     ccSet( CC::Decimal, false );
 }
 
-void c6502::op_cli(Addr addr) {
+void CPU6502::op_cli(Addr addr) {
     delayed_ops = DelayedOps::CLI;
 }
 
-void c6502::op_clv(Addr addr) {
+void CPU6502::op_clv(Addr addr) {
     ccSet( CC::oVerflow, false );
 }
 
-void c6502::op_cmp(Addr addr) {
+void CPU6502::op_cmp(Addr addr) {
     uint16_t calc = 0x100 | regA;
     calc -= read(addr);
 
@@ -641,7 +641,7 @@ void c6502::op_cmp(Addr addr) {
     updateNZ( calc );
 }
 
-void c6502::op_cpx(Addr addr) {
+void CPU6502::op_cpx(Addr addr) {
     uint16_t calc = 0x100 | regX;
     calc -= read(addr);
 
@@ -649,7 +649,7 @@ void c6502::op_cpx(Addr addr) {
     ccSet( CC::Carry, calc & 0x100 );
 }
 
-void c6502::op_cpy(Addr addr) {
+void CPU6502::op_cpy(Addr addr) {
     uint16_t calc = 0x100 | regY;
     calc -= read(addr);
 
@@ -657,7 +657,7 @@ void c6502::op_cpy(Addr addr) {
     ccSet( CC::Carry, calc & 0x100 );
 }
 
-void c6502::op_dec(Addr addr) {
+void CPU6502::op_dec(Addr addr) {
     uint8_t res = read(addr);
     write(addr, res);
 
@@ -667,31 +667,31 @@ void c6502::op_dec(Addr addr) {
     updateNZ( res );
 }
 
-void c6502::op_decA(Addr addr) {
+void CPU6502::op_decA(Addr addr) {
     regX--;
 
     updateNZ( regX );
 }
 
-void c6502::op_dex(Addr addr) {
+void CPU6502::op_dex(Addr addr) {
     regX--;
 
     updateNZ( regX );
 }
 
-void c6502::op_dey(Addr addr) {
+void CPU6502::op_dey(Addr addr) {
     regY--;
 
     updateNZ( regY );
 }
 
-void c6502::op_eor(Addr addr) {
+void CPU6502::op_eor(Addr addr) {
     regA ^= read(addr);
 
     updateNZ( regA );
 }
 
-void c6502::op_inc(Addr addr) {
+void CPU6502::op_inc(Addr addr) {
     uint8_t val = read(addr);
 
     write(addr, val);
@@ -700,30 +700,30 @@ void c6502::op_inc(Addr addr) {
     updateNZ( val );
 }
 
-void c6502::op_incA(Addr addr) {
+void CPU6502::op_incA(Addr addr) {
     regA++;
 
     updateNZ( regA );
 }
 
-void c6502::op_inx(Addr addr) {
+void CPU6502::op_inx(Addr addr) {
     regX++;
 
     updateNZ( regX );
 }
 
-void c6502::op_iny(Addr addr) {
+void CPU6502::op_iny(Addr addr) {
     regY++;
 
     updateNZ( regY );
 }
 
-void c6502::op_jmp(Addr addr) {
+void CPU6502::op_jmp(Addr addr) {
     regPcL = addr & 0xff;
     regPcH = addr >> 8;
 }
 
-void c6502::op_jsr(Addr addr) {
+void CPU6502::op_jsr(Addr addr) {
     uint8_t dest_low = read( pc() );
     advance_pc();
 
@@ -735,25 +735,25 @@ void c6502::op_jsr(Addr addr) {
     regPcL = dest_low;
 }
 
-void c6502::op_lda(Addr addr) {
+void CPU6502::op_lda(Addr addr) {
     regA = read( addr );
 
     updateNZ( regA );
 }
 
-void c6502::op_ldx(Addr addr) {
+void CPU6502::op_ldx(Addr addr) {
     regX = read( addr );
 
     updateNZ( regX );
 }
 
-void c6502::op_ldy(Addr addr) {
+void CPU6502::op_ldy(Addr addr) {
     regY = read( addr );
 
     updateNZ( regY );
 }
 
-void c6502::op_lsr(Addr addr) {
+void CPU6502::op_lsr(Addr addr) {
     uint8_t val = read(addr);
     write(addr, val);
 
@@ -765,7 +765,7 @@ void c6502::op_lsr(Addr addr) {
     write(addr, val);
 }
 
-void c6502::op_lsrA() {
+void CPU6502::op_lsrA() {
     read( pc() );
 
     ccSet( CC::Carry, regA&0x01 );
@@ -775,29 +775,29 @@ void c6502::op_lsrA() {
     updateNZ( regA );
 }
 
-void c6502::op_nop(Addr addr) {
+void CPU6502::op_nop(Addr addr) {
 }
 
-void c6502::op_ora(Addr addr) {
+void CPU6502::op_ora(Addr addr) {
     regA |= read(addr);
 
     updateNZ( regA );
 }
 
 
-void c6502::op_pha(Addr addr) {
+void CPU6502::op_pha(Addr addr) {
     write( addr, regA );
 
     regSp--;
 }
 
-void c6502::op_php(Addr addr) {
+void CPU6502::op_php(Addr addr) {
     write( addr, regStatus );
 
     regSp--;
 }
 
-void c6502::op_pla(Addr addr) {
+void CPU6502::op_pla(Addr addr) {
     read( addr );
 
     regSp++;
@@ -806,14 +806,14 @@ void c6502::op_pla(Addr addr) {
     updateNZ( regA );
 }
 
-void c6502::op_plp(Addr addr) {
+void CPU6502::op_plp(Addr addr) {
     read( addr );
 
     regSp++;
     regStatus = read( compose( 0x01, regSp ) ) | 0x30;
 }
 
-void c6502::op_rol(Addr addr) {
+void CPU6502::op_rol(Addr addr) {
     uint16_t value = read( addr );
     write( addr, value );
 
@@ -825,7 +825,7 @@ void c6502::op_rol(Addr addr) {
     write( addr, value );
 }
 
-void c6502::op_rolA() {
+void CPU6502::op_rolA() {
     read( pc() );
 
     bool newC = regA & 0x80;
@@ -837,7 +837,7 @@ void c6502::op_rolA() {
     updateNZ( regA );
 }
 
-void c6502::op_ror(Addr addr) {
+void CPU6502::op_ror(Addr addr) {
     uint8_t value = read( addr );
     write( addr, value );
 
@@ -850,7 +850,7 @@ void c6502::op_ror(Addr addr) {
     write( addr, value );
 }
 
-void c6502::op_rorA() {
+void CPU6502::op_rorA() {
     read( pc() );
 
     bool newC = regA & 0x01;
@@ -861,7 +861,7 @@ void c6502::op_rorA() {
 
 }
 
-void c6502::op_rti(Addr addr) {
+void CPU6502::op_rti(Addr addr) {
     read( addr );
     regSp++;
 
@@ -871,7 +871,7 @@ void c6502::op_rti(Addr addr) {
     regPcH = read( compose(0x01, regSp) );
 }
 
-void c6502::op_rts(Addr addr) {
+void CPU6502::op_rts(Addr addr) {
     read( compose(0x01, regSp++) );
 
     regPcL = read( compose(0x01, regSp++) );
@@ -881,7 +881,7 @@ void c6502::op_rts(Addr addr) {
     advance_pc();
 }
 
-void c6502::op_sbc(Addr addr) {
+void CPU6502::op_sbc(Addr addr) {
     uint8_t val = read(addr);
 
     uint16_t res = regA - val;
@@ -899,31 +899,31 @@ void c6502::op_sbc(Addr addr) {
     ccSet( CC::Carry, (res & 0x100)==0 );
 }
 
-void c6502::op_sec(Addr addr) {
+void CPU6502::op_sec(Addr addr) {
     ccSet( CC::Carry, true );
 }
 
-void c6502::op_sed(Addr addr) {
+void CPU6502::op_sed(Addr addr) {
     ccSet( CC::Decimal, true );
 }
 
-void c6502::op_sei(Addr addr) {
+void CPU6502::op_sei(Addr addr) {
     delayed_ops = DelayedOps::SEI;
 }
 
-void c6502::op_sta(Addr addr) {
+void CPU6502::op_sta(Addr addr) {
     write( addr, regA );
 }
 
-void c6502::op_stx(Addr addr) {
+void CPU6502::op_stx(Addr addr) {
     write( addr, regX );
 }
 
-void c6502::op_sty(Addr addr) {
+void CPU6502::op_sty(Addr addr) {
     write( addr, regY );
 }
 
-void c6502::op_tax() {
+void CPU6502::op_tax() {
     read( pc() );
 
     regX = regA;
@@ -931,7 +931,7 @@ void c6502::op_tax() {
     updateNZ( regA );
 }
 
-void c6502::op_tay() {
+void CPU6502::op_tay() {
     read( pc() );
 
     regY = regA;
@@ -939,7 +939,7 @@ void c6502::op_tay() {
     updateNZ( regA );
 }
 
-void c6502::op_tsx() {
+void CPU6502::op_tsx() {
     read( pc() );
 
     regX = regSp;
@@ -948,7 +948,7 @@ void c6502::op_tsx() {
 }
 
 
-void c6502::op_txa() {
+void CPU6502::op_txa() {
     read( pc() );
 
     regA = regX;
@@ -956,13 +956,13 @@ void c6502::op_txa() {
     updateNZ( regA );
 }
 
-void c6502::op_txs() {
+void CPU6502::op_txs() {
     read( pc() );
 
     regSp = regX;
 }
 
-void c6502::op_tya() {
+void CPU6502::op_tya() {
     read( pc() );
 
     regA = regY;
@@ -970,7 +970,7 @@ void c6502::op_tya() {
     updateNZ( regA );
 }
 
-void c6502::updateNZ(uint8_t val) {
+void CPU6502::updateNZ(uint8_t val) {
     ccSet( CC::Negative, val & 0x80 );
     ccSet( CC::Zero, val == 0 );
 }
